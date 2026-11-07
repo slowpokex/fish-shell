@@ -198,6 +198,21 @@ class TankTests(unittest.TestCase):
         self.assertEqual(foods, [[60.0, 2.0]])
 
 
+class RelayoutTests(unittest.TestCase):
+    def test_relayout_spreads_fish_after_shrink_then_grow(self):
+        rng = random.Random(5)
+        fish = aquarium.spawn_fish({"Рыбка": 20}, 120, 40, rng)
+        for f in fish:
+            aquarium.step_fish(f, 60, 12, 0.05, None)
+        aquarium.relayout_fish(fish, 60, 120, 40, rng)
+        rows = {round(f.y) for f in fish}
+        self.assertGreater(len(rows), 5)
+        for f in fish:
+            max_x, max_y = aquarium._bounds(f, 120, 40)
+            self.assertTrue(0 <= f.x <= max_x)
+            self.assertTrue(1 <= f.y <= max_y)
+
+
 class EntryTests(unittest.TestCase):
     def test_choose_start_no_config_is_picker(self):
         self.assertEqual(aquarium.choose_start(None, False), "picker")

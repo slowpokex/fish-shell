@@ -274,6 +274,14 @@ PALETTE = [curses.COLOR_RED, curses.COLOR_GREEN, curses.COLOR_YELLOW,
            curses.COLOR_BLUE, curses.COLOR_MAGENTA, curses.COLOR_CYAN]
 
 
+def relayout_fish(fish_list, old_width, new_width, height, rng):
+    """При смене размера окна растягивает x и заново раскидывает рыб по рядам."""
+    for fish in fish_list:
+        max_x, max_y = _bounds(fish, new_width, height)
+        fish.x = min(float(max_x), fish.x * new_width / max(1, old_width))
+        fish.y = float(rng.randint(1, max_y))
+
+
 def tank_too_small(width, height):
     return width < MIN_WIDTH or height < MIN_HEIGHT
 
@@ -344,6 +352,7 @@ def run_aquarium(stdscr, counts):
     colors = _init_colors()
     rng = random.Random()
     height, width = stdscr.getmaxyx()
+    size = (width, height)
     fish_list = spawn_fish(counts, width, height, rng)
     foods = []
     paused = False
@@ -354,6 +363,9 @@ def run_aquarium(stdscr, counts):
         dt = min(now - last, 0.2)
         last = now
         height, width = stdscr.getmaxyx()
+        if (width, height) != size:
+            relayout_fish(fish_list, size[0], width, height, rng)
+            size = (width, height)
         code = stdscr.getch()
         if code in (ord("q"), ord("Q")):
             return "quit"
