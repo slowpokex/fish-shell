@@ -3,6 +3,7 @@
 import curses
 import json
 import random
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -378,3 +379,34 @@ def run_aquarium(stdscr, counts):
             for fish in fish_list:
                 step_fish(fish, width, height, 0.0, None)
         draw_aquarium(stdscr, fish_list, foods, colors, tick, paused)
+
+
+# --- точка входа ----------------------------------------------------------
+
+def choose_start(config, setup_flag):
+    return "picker" if config is None or setup_flag else "aquarium"
+
+
+def main(argv):
+    if not sys.stdout.isatty():
+        return 0
+    path = config_path()
+    counts = load_config(path, list(SPECIES))
+    stage = choose_start(counts, "--setup" in argv)
+    try:
+        while True:
+            if stage == "picker":
+                picked = curses.wrapper(run_picker, counts or {})
+                if picked is None:
+                    return 0
+                counts = picked
+                save_config(path, counts)
+            if curses.wrapper(run_aquarium, counts) != "setup":
+                return 0
+            stage = "picker"
+    except KeyboardInterrupt:
+        return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

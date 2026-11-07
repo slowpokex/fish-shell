@@ -1,8 +1,10 @@
+import io
 import json
 import random
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import aquarium
 
@@ -194,6 +196,29 @@ class TankTests(unittest.TestCase):
         foods = [[11.0, 5.0], [60.0, 2.0]]
         aquarium.feed_step(foods, [fish], 24, 0.0)
         self.assertEqual(foods, [[60.0, 2.0]])
+
+
+class EntryTests(unittest.TestCase):
+    def test_choose_start_no_config_is_picker(self):
+        self.assertEqual(aquarium.choose_start(None, False), "picker")
+
+    def test_choose_start_with_config_is_aquarium(self):
+        self.assertEqual(aquarium.choose_start({"Рыбка": 1}, False), "aquarium")
+
+    def test_choose_start_setup_flag_forces_picker(self):
+        self.assertEqual(aquarium.choose_start({"Рыбка": 1}, True), "picker")
+
+    def test_main_non_tty_exits_quietly(self):
+        class NotTty(io.StringIO):
+            def isatty(self):
+                return False
+
+        out = NotTty()
+        with mock.patch("sys.stdout", out), mock.patch.object(
+            aquarium.curses, "wrapper", side_effect=AssertionError("curses used")
+        ):
+            self.assertEqual(aquarium.main([]), 0)
+        self.assertEqual(out.getvalue(), "")
 
 
 if __name__ == "__main__":
