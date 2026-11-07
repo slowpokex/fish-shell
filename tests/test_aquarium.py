@@ -121,5 +121,55 @@ class FishTests(unittest.TestCase):
         self.assertEqual(f.y, 5.0)
 
 
+class PickerTests(unittest.TestCase):
+    def setUp(self):
+        self.names = list(aquarium.SPECIES)
+        self.state = aquarium.PickerState(counts={n: 0 for n in self.names}, cursor=0)
+        self.rng = random.Random(3)
+
+    def press(self, *keys):
+        result = None
+        for key in keys:
+            result = aquarium.picker_handle_key(self.state, key, self.rng)
+        return result
+
+    def test_picker_right_increments_and_clamps_at_20(self):
+        self.press(*["right"] * 25)
+        self.assertEqual(self.state.counts[self.names[0]], 20)
+
+    def test_picker_left_clamps_at_0(self):
+        self.press("left")
+        self.assertEqual(self.state.counts[self.names[0]], 0)
+
+    def test_picker_space_toggles(self):
+        self.press("right", "right", "space")
+        self.assertEqual(self.state.counts[self.names[0]], 0)
+        self.press("space")
+        self.assertEqual(self.state.counts[self.names[0]], 1)
+
+    def test_picker_cursor_wraps_up_down(self):
+        self.press("up")
+        self.assertEqual(self.state.cursor, len(self.names) - 1)
+        self.press("down")
+        self.assertEqual(self.state.cursor, 0)
+
+    def test_picker_enter_with_zero_total_does_not_start(self):
+        self.assertIsNone(self.press("enter"))
+
+    def test_picker_enter_starts_when_total_positive(self):
+        self.press("right")
+        self.assertEqual(self.press("enter"), "start")
+
+    def test_picker_q_quits(self):
+        self.assertEqual(self.press("q"), "quit")
+
+    def test_picker_random_sum_at_least_one(self):
+        for seed in range(50):
+            self.state.counts = {n: 0 for n in self.names}
+            aquarium.picker_handle_key(self.state, "r", random.Random(seed))
+            self.assertGreaterEqual(sum(self.state.counts.values()), 1)
+            self.assertTrue(all(0 <= v <= 5 for v in self.state.counts.values()))
+
+
 if __name__ == "__main__":
     unittest.main()
