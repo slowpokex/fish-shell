@@ -171,5 +171,30 @@ class PickerTests(unittest.TestCase):
             self.assertTrue(all(0 <= v <= 5 for v in self.state.counts.values()))
 
 
+class TankTests(unittest.TestCase):
+    def test_tank_too_small_boundaries(self):
+        self.assertTrue(aquarium.tank_too_small(39, 12))
+        self.assertTrue(aquarium.tank_too_small(40, 11))
+        self.assertFalse(aquarium.tank_too_small(40, 12))
+
+    def test_fish_and_nick_stay_above_weeds(self):
+        counts = {name: 10 for name in aquarium.SPECIES}
+        for f in aquarium.spawn_fish(counts, 80, 12, random.Random(4)):
+            self.assertLessEqual(f.y + len(aquarium.fish_lines(f)), 12 - 4)
+
+    def test_feed_step_food_falls_and_hits_bottom(self):
+        foods = [[10.0, 1.0]]
+        aquarium.feed_step(foods, [], 20, 1.0)
+        self.assertGreater(foods[0][1], 1.0)
+        aquarium.feed_step(foods, [], 20, 100.0)
+        self.assertEqual(foods, [])
+
+    def test_feed_step_fish_eats_food(self):
+        fish = aquarium.Fish("Рыбка", 10.0, 5.0, 1, 5.0, 1, "n")
+        foods = [[11.0, 5.0], [60.0, 2.0]]
+        aquarium.feed_step(foods, [fish], 24, 0.0)
+        self.assertEqual(foods, [[60.0, 2.0]])
+
+
 if __name__ == "__main__":
     unittest.main()

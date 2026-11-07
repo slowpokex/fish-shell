@@ -3,6 +3,7 @@
 import curses
 import json
 import random
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple
@@ -120,7 +121,8 @@ def fish_width(fish):
 
 
 def _bounds(fish, width, height):
-    return max(0, width - fish_width(fish)), max(1, height - 3)
+    # снизу остаются ник, два ряда водорослей и строка подсказки
+    return max(0, width - fish_width(fish)), max(1, height - 6)
 
 
 def spawn_fish(counts, width, height, rng):
@@ -259,3 +261,120 @@ def run_picker(stdscr, initial):
             return dict(state.counts)
         if action == "quit":
             return None
+
+
+# --- экран аквариума ------------------------------------------------------
+
+MIN_WIDTH = 40
+MIN_HEIGHT = 12
+FOOD_FALL = 4.0
+HELP = "q — выход · f — покормить · p — пауза · c — выбор рыб"
+PALETTE = [curses.COLOR_RED, curses.COLOR_GREEN, curses.COLOR_YELLOW,
+           curses.COLOR_BLUE, curses.COLOR_MAGENTA, curses.COLOR_CYAN]
+
+
+def tank_too_small(width, height):
+    return width < MIN_WIDTH or height < MIN_HEIGHT
+
+
+def feed_step(foods, fish_list, height, dt):
+    """Роняет корм и убирает съеденный или упавший на дно."""
+    for food in foods:
+        food[1] += FOOD_FALL * dt
+    foods[:] = [
+        f for f in foods
+        if f[1] < height - 3 and not any(_touches(fish, f) for fish in fish_list)
+    ]
+
+
+def _touches(fish, food):
+    rows = len(fish_lines(fish))
+    return (fish.x <= food[0] < fish.x + fish_width(fish)
+            and round(fish.y) <= round(food[1]) < round(fish.y) + rows)
+
+
+def _nearest_food(fish, foods):
+    near = [f for f in foods if abs(f[0] - fish.x) <= FOOD_RADIUS]
+    if not near:
+        return None
+    best = min(near, key=lambda f: abs(f[0] - fish.x) + abs(f[1] - fish.y))
+    return best[0], best[1]
+
+
+def _init_colors():
+    if not (curses.has_colors() and curses.COLORS >= 8):
+        return False
+    curses.start_color()
+    curses.use_default_colors()
+    for i, color in enumerate(PALETTE, start=1):
+        curses.init_pair(i, color, -1)
+    return True
+
+
+def draw_aquarium(stdscr, fish_list, foods, colors, tick, paused):
+    stdscr.erase()
+    height, width = stdscr.getmaxyx()
+    safe_addstr(stdscr, 0, 0, ("^^^^ " * (width // 5 + 1))[:width - 1])
+    for fish in fish_list:
+        attr = curses.color_pair(fish.color) if colors else 0
+        x, y = int(fish.x), int(fish.y)
+        lines = fish_lines(fish)
+        for i, line in enumerate(lines):
+            safe_addstr(stdscr, y + i, x, line, attr)
+        nick_x = max(0, x + (fish_width(fish) - len(fish.nick)) // 2)
+        safe_addstr(stdscr, y + len(lines), nick_x, fish.nick[:width - nick_x - 1], attr)
+    for food in foods:
+        safe_addstr(stdscr, int(food[1]), int(food[0]), "o")
+    green = curses.color_pair(2) if colors else 0
+    for x in range(1, width - 1, 7):
+        for row in (height - 3, height - 2):
+            sway = (tick // 8 + x + row) % 2
+            safe_addstr(stdscr, row, x, "}" if sway else "{", green)
+    status = HELP + ("  [пауза]" if paused else "")
+    safe_addstr(stdscr, height - 1, 0, status[:width - 1])
+    stdscr.refresh()
+
+
+def run_aquarium(stdscr, counts):
+    """Крутит аквариум; возвращает "quit" или "setup" (клавиша c)."""
+    curses.curs_set(0)
+    stdscr.keypad(True)
+    stdscr.timeout(50)
+    colors = _init_colors()
+    rng = random.Random()
+    height, width = stdscr.getmaxyx()
+    fish_list = spawn_fish(counts, width, height, rng)
+    foods = []
+    paused = False
+    tick = 0
+    last = time.monotonic()
+    while True:
+        now = time.monotonic()
+        dt = min(now - last, 0.2)
+        last = now
+        height, width = stdscr.getmaxyx()
+        code = stdscr.getch()
+        if code in (ord("q"), ord("Q")):
+            return "quit"
+        if code in (ord("c"), ord("C")):
+            return "setup"
+        if code in (ord("p"), ord("P")):
+            paused = not paused
+        if code in (ord("f"), ord("F")) and not tank_too_small(width, height):
+            foods.append([float(rng.randint(0, width - 2)), 1.0])
+        if tank_too_small(width, height):
+            stdscr.erase()
+            msg = "окно слишком маленькое"
+            safe_addstr(stdscr, height // 2, max(0, (width - len(msg)) // 2),
+                        msg[:max(0, width - 1)])
+            stdscr.refresh()
+            continue
+        if not paused:
+            tick += 1
+            for fish in fish_list:
+                step_fish(fish, width, height, dt, _nearest_food(fish, foods))
+            feed_step(foods, fish_list, height, dt)
+        else:
+            for fish in fish_list:
+                step_fish(fish, width, height, 0.0, None)
+        draw_aquarium(stdscr, fish_list, foods, colors, tick, paused)
