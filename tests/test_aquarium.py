@@ -175,9 +175,9 @@ class PickerTests(unittest.TestCase):
 
 class TankTests(unittest.TestCase):
     def test_tank_too_small_boundaries(self):
-        self.assertTrue(aquarium.tank_too_small(39, 12))
-        self.assertTrue(aquarium.tank_too_small(40, 11))
-        self.assertFalse(aquarium.tank_too_small(40, 12))
+        self.assertTrue(aquarium.tank_too_small(49, 16))
+        self.assertTrue(aquarium.tank_too_small(50, 15))
+        self.assertFalse(aquarium.tank_too_small(50, 16))
 
     def test_fish_and_nick_stay_above_weeds(self):
         counts = {name: 10 for name in aquarium.SPECIES}
@@ -196,6 +196,80 @@ class TankTests(unittest.TestCase):
         foods = [[11.0, 5.0], [60.0, 2.0]]
         aquarium.feed_step(foods, [fish], 24, 0.0)
         self.assertEqual(foods, [[60.0, 2.0]])
+
+
+class SpeciesTests(unittest.TestCase):
+    def test_twelve_species_with_3_to_7_lines(self):
+        self.assertEqual(len(aquarium.SPECIES), 12)
+        heights = [len(sp.right) for sp in aquarium.SPECIES.values()]
+        self.assertTrue(all(3 <= h <= 7 for h in heights), heights)
+        self.assertGreaterEqual(max(heights), 6)
+
+    def test_old_species_names_kept(self):
+        for name in ("Рыбка", "Рыба-меч", "Окунь", "Акула", "Кит", "Медуза"):
+            self.assertIn(name, aquarium.SPECIES)
+
+    def test_left_art_is_a_full_mirror(self):
+        for sp in aquarium.SPECIES.values():
+            self.assertEqual(len(sp.left), len(sp.right), sp.name)
+            width = max(len(line) for line in sp.right)
+            self.assertTrue(all(len(line) == width for line in sp.left), sp.name)
+            self.assertEqual(aquarium._mirror(sp.left), [l.ljust(width) for l in sp.right], sp.name)
+
+    def test_every_species_has_icon(self):
+        for sp in aquarium.SPECIES.values():
+            self.assertTrue(sp.icon, sp.name)
+
+    def test_tall_fish_and_nick_stay_above_weeds_at_min_height(self):
+        counts = {name: 10 for name in aquarium.SPECIES}
+        for f in aquarium.spawn_fish(counts, 80, 16, random.Random(8)):
+            self.assertLessEqual(f.y + len(aquarium.fish_lines(f)), 16 - 4)
+
+    def test_accent_positions_mark_eyes(self):
+        fish = aquarium.Fish("Рыбка", 0.0, 1.0, 1, 5.0, 1, "n")
+        cells = aquarium.accent_positions(fish)
+        self.assertTrue(cells)
+        lines = aquarium.fish_lines(fish)
+        for row, col in cells:
+            self.assertIn(lines[row][col], "o°@")
+
+    def test_old_config_loads_with_new_species_at_zero(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        path = Path(tmp.name) / "config.json"
+        path.write_text(json.dumps({"Рыбка": 2, "Акула": 1}), encoding="utf-8")
+        counts = aquarium.load_config(path, list(aquarium.SPECIES))
+        self.assertEqual(counts["Рыбка"], 2)
+        self.assertEqual(sum(counts.values()), 3)
+
+
+class BubbleTests(unittest.TestCase):
+    class AlwaysRng:
+        def random(self):
+            return 0.0
+
+    def make_fish(self, x=10.0):
+        return aquarium.Fish("Рыбка", x, 5.0, 1, 5.0, 1, "n")
+
+    def test_bubbles_rise_and_vanish_at_surface(self):
+        bubbles = [[5.0, 10.0]]
+        aquarium.bubble_step(bubbles, [], 1.0, random.Random(1))
+        self.assertLess(bubbles[0][1], 10.0)
+        aquarium.bubble_step(bubbles, [], 100.0, random.Random(1))
+        self.assertEqual(bubbles, [])
+
+    def test_bubble_comes_from_fish_head(self):
+        fish = self.make_fish()
+        bubbles = []
+        aquarium.bubble_step(bubbles, [fish], 1.0, self.AlwaysRng())
+        self.assertEqual(len(bubbles), 1)
+        self.assertEqual(bubbles[0][0], fish.x + aquarium.fish_width(fish) - 1)
+
+    def test_bubbles_are_capped(self):
+        fish = [self.make_fish() for _ in range(200)]
+        bubbles = []
+        aquarium.bubble_step(bubbles, fish, 1.0, self.AlwaysRng())
+        self.assertLessEqual(len(bubbles), aquarium.MAX_BUBBLES)
 
 
 class RelayoutTests(unittest.TestCase):

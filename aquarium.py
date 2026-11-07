@@ -56,9 +56,10 @@ class Species(NamedTuple):
     right: list
     left: list
     speed: tuple
+    icon: str
 
 
-_MIRROR = str.maketrans("<>()[]{}/\\", "><)(][}{\\/")
+_MIRROR = str.maketrans("<>()[]{}/\\`'", "><)(][}{\\/'`")
 
 
 def _mirror(lines):
@@ -66,17 +67,93 @@ def _mirror(lines):
     return [line.ljust(width)[::-1].translate(_MIRROR) for line in lines]
 
 
-def _species(name, right, speed):
-    return Species(name, right, _mirror(right), speed)
+def _species(name, right, speed, icon):
+    return Species(name, right, _mirror(right), speed, icon)
 
 
+# Рисунки смотрят вправо; "o", "°" и "@" считаются глазами и рисуются ярче.
 SPECIES = {s.name: s for s in [
-    _species("Рыбка", ["><>"], (6, 12)),
-    _species("Рыба-меч", [">=_('>"], (10, 16)),
-    _species("Окунь", ["><(((°>"], (5, 10)),
-    _species("Акула", [" __/|__", "><_____o>"], (8, 14)),
-    _species("Кит", [" ,---.__", "(o     _)>"], (3, 6)),
-    _species("Медуза", ["(~~~)", " }{}{"], (1, 3)),
+    _species("Рыбка", [
+        r"  ,--.  ",
+        r"><(  o)>",
+        r"  `--'  ",
+    ], (6, 12), "><(o)>"),
+    _species("Рыба-меч", [
+        r"       ,___     ",
+        r"~~===<  o >-----",
+        r"       `--'     ",
+    ], (10, 16), "=<o>---"),
+    _species("Окунь", [
+        r"    ,-./|\,   ",
+        r" \,'  |||  `. ",
+        r"  >=  ||||  o>",
+        r" /`.  |||  ,' ",
+        r"    `-\|/'    ",
+    ], (5, 10), "><(|o>"),
+    _species("Акула", [
+        r"           /|     ",
+        r"          / |     ",
+        r"  _______/  |___  ",
+        r"><_____________o_>",
+        r"  `-.______,.-'   ",
+    ], (8, 14), "><__o_>"),
+    _species("Кит", [
+        r"          \|/        ",
+        r"           |         ",
+        r"    ,-----------.__  ",
+        r" __/               `.",
+        r"/              o    _\>",
+        r"\_    ___________,-'  ",
+        r"  `--'               ",
+    ], (3, 6), "(____o>"),
+    _species("Медуза", [
+        r"  .-===-.  ",
+        r" /       \ ",
+        r"| o     o |",
+        r" \_______/ ",
+        r"  | | | |  ",
+        r"  ) ( ) (  ",
+    ], (1, 3), "(o_o)"),
+    _species("Ангел", [
+        r"       /\       ",
+        r"      /  \      ",
+        r"     /    \     ",
+        r" ><(   .  o  )> ",
+        r"     \    /     ",
+        r"      \  /      ",
+        r"       \/       ",
+    ], (4, 8), "/o\\"),
+    _species("Скат", [
+        r"      __       ",
+        r"   .-'  `-.    ",
+        r"  <  o  o   >~~~",
+        r"   `-.____.-'  ",
+    ], (4, 9), "<o o>~"),
+    _species("Осьминог", [
+        r"   ,---.   ",
+        r"  ( o o )  ",
+        r"  /`---'\  ",
+        r" // | | \\ ",
+        r" ~~ ~ ~ ~~ ",
+    ], (2, 5), "(oo)~"),
+    _species("Конёк", [
+        r"  _   ",
+        r" (o`> ",
+        r" ) /  ",
+        r" ( (  ",
+        r"  ) ) ",
+        r" (_/  ",
+    ], (2, 4), "(o`>"),
+    _species("Пиранья", [
+        r"    ,--.   ",
+        r"><( o |vvv>",
+        r"    `--'   ",
+    ], (10, 18), "><(ovv>"),
+    _species("Мальки", [
+        r" ><>   ",
+        r"    ><>",
+        r" ><>   ",
+    ], (8, 14), "><> ><>"),
 ]}
 
 NICKS = [
@@ -123,7 +200,7 @@ def fish_width(fish):
 
 def _bounds(fish, width, height):
     # снизу остаются ник, два ряда водорослей и строка подсказки
-    return max(0, width - fish_width(fish)), max(1, height - 6)
+    return max(0, width - fish_width(fish)), max(1, height - 4 - len(fish_lines(fish)))
 
 
 def spawn_fish(counts, width, height, rng):
@@ -230,7 +307,7 @@ def draw_picker(stdscr, state):
     for i, (name, count) in enumerate(state.counts.items()):
         mark = "x" if count else " "
         pointer = "▶" if i == state.cursor else " "
-        art = SPECIES[name].right[-1].strip()
+        art = SPECIES[name].icon
         attr = curses.A_BOLD if i == state.cursor else 0
         row(4 + i, f" {pointer} [{mark}] {art:<11} {name:<9} × {count}", attr)
     n = 4 + len(SPECIES)
@@ -266,10 +343,15 @@ def run_picker(stdscr, initial):
 
 # --- экран аквариума ------------------------------------------------------
 
-MIN_WIDTH = 40
-MIN_HEIGHT = 12
+MIN_WIDTH = 50
+MIN_HEIGHT = 16
 FOOD_FALL = 4.0
 HELP = "q — выход · f — покормить · p — пауза · c — выбор рыб"
+MAX_BUBBLES = 40
+BUBBLE_RISE = 3.0
+BUBBLE_RATE = 0.15  # пузырьков в секунду на одну рыбу
+EYES = "o°@"
+ACCENT_PAIR = 7
 PALETTE = [curses.COLOR_RED, curses.COLOR_GREEN, curses.COLOR_YELLOW,
            curses.COLOR_BLUE, curses.COLOR_MAGENTA, curses.COLOR_CYAN]
 
@@ -280,6 +362,23 @@ def relayout_fish(fish_list, old_width, new_width, height, rng):
         max_x, max_y = _bounds(fish, new_width, height)
         fish.x = min(float(max_x), fish.x * new_width / max(1, old_width))
         fish.y = float(rng.randint(1, max_y))
+
+
+def accent_positions(fish):
+    """Клетки (ряд, столбец) рисунка рыбы, которые рисуются ярче: глаза."""
+    return [(r, c) for r, line in enumerate(fish_lines(fish))
+            for c, ch in enumerate(line) if ch in EYES]
+
+
+def bubble_step(bubbles, fish_list, dt, rng):
+    """Поднимает пузырьки к поверхности и иногда выпускает новые у морды рыб."""
+    for bubble in bubbles:
+        bubble[1] -= BUBBLE_RISE * dt
+    bubbles[:] = [b for b in bubbles if b[1] >= 1]
+    for fish in fish_list:
+        if len(bubbles) < MAX_BUBBLES and rng.random() < BUBBLE_RATE * dt:
+            head = fish.x + (fish_width(fish) - 1 if fish.dx > 0 else 0)
+            bubbles.append([head, fish.y])
 
 
 def tank_too_small(width, height):
@@ -317,10 +416,11 @@ def _init_colors():
     curses.use_default_colors()
     for i, color in enumerate(PALETTE, start=1):
         curses.init_pair(i, color, -1)
+    curses.init_pair(ACCENT_PAIR, curses.COLOR_WHITE, -1)
     return True
 
 
-def draw_aquarium(stdscr, fish_list, foods, colors, tick, paused):
+def draw_aquarium(stdscr, fish_list, foods, bubbles, colors, tick, paused):
     stdscr.erase()
     height, width = stdscr.getmaxyx()
     safe_addstr(stdscr, 0, 0, ("^^^^ " * (width // 5 + 1))[:width - 1])
@@ -330,10 +430,15 @@ def draw_aquarium(stdscr, fish_list, foods, colors, tick, paused):
         lines = fish_lines(fish)
         for i, line in enumerate(lines):
             safe_addstr(stdscr, y + i, x, line, attr)
+        eye = (curses.color_pair(ACCENT_PAIR) if colors else 0) | curses.A_BOLD
+        for row, col in accent_positions(fish):
+            safe_addstr(stdscr, y + row, x + col, lines[row][col], eye)
         nick_x = max(0, x + (fish_width(fish) - len(fish.nick)) // 2)
         safe_addstr(stdscr, y + len(lines), nick_x, fish.nick[:width - nick_x - 1], attr)
+    for bx, by in bubbles:
+        safe_addstr(stdscr, int(by), int(bx), "°" if int(by) % 2 else "o")
     for food in foods:
-        safe_addstr(stdscr, int(food[1]), int(food[0]), "o")
+        safe_addstr(stdscr, int(food[1]), int(food[0]), "*")
     green = curses.color_pair(2) if colors else 0
     for x in range(1, width - 1, 7):
         for row in (height - 3, height - 2):
@@ -355,6 +460,7 @@ def run_aquarium(stdscr, counts):
     size = (width, height)
     fish_list = spawn_fish(counts, width, height, rng)
     foods = []
+    bubbles = []
     paused = False
     tick = 0
     last = time.monotonic()
@@ -387,10 +493,11 @@ def run_aquarium(stdscr, counts):
             for fish in fish_list:
                 step_fish(fish, width, height, dt, _nearest_food(fish, foods))
             feed_step(foods, fish_list, height, dt)
+            bubble_step(bubbles, fish_list, dt, rng)
         else:
             for fish in fish_list:
                 step_fish(fish, width, height, 0.0, None)
-        draw_aquarium(stdscr, fish_list, foods, colors, tick, paused)
+        draw_aquarium(stdscr, fish_list, foods, bubbles, colors, tick, paused)
 
 
 # --- точка входа ----------------------------------------------------------
