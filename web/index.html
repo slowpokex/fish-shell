@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Аквариум</title>
+<style>
+  :root {
+    --ink: #d8f6ff;
+    --dim: #7fb3c4;
+    --panel: rgba(4, 18, 32, 0.92);
+    --edge: #2b6f8a;
+    --hot: #ff4d6d;
+  }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; background: #020a14; overflow: hidden; }
+  body { font-family: Menlo, Consolas, "DejaVu Sans Mono", monospace; color: var(--ink); }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; }
+  #help {
+    position: fixed; left: 0; right: 0; bottom: 0; padding: 4px 12px 6px;
+    font-size: 13px; color: var(--dim); background: rgba(2, 10, 20, 0.6);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: none;
+  }
+  #help b { color: var(--ink); font-weight: normal; }
+  #banner {
+    position: fixed; top: 6px; left: 50%; transform: translateX(-50%);
+    padding: 4px 14px; font-weight: bold; letter-spacing: 0.04em;
+    color: #fff; background: var(--hot); border-radius: 4px;
+    box-shadow: 0 0 18px var(--hot); white-space: nowrap; pointer-events: none;
+  }
+  #picker {
+    position: fixed; inset: 0; display: grid; place-items: center;
+    background: rgba(1, 6, 12, 0.55); backdrop-filter: blur(2px);
+  }
+  .box {
+    min-width: min(420px, calc(100vw - 32px)); max-width: calc(100vw - 32px);
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 8px;
+    padding: 14px 16px; box-shadow: 0 0 40px rgba(60, 200, 255, 0.15);
+  }
+  .box h1 { font-size: 15px; margin: 0 0 4px; letter-spacing: 0.1em; }
+  .box p { margin: 0 0 10px; color: var(--dim); font-size: 12px; }
+  .row {
+    display: grid; grid-template-columns: 16px 128px 1fr auto; gap: 8px; white-space: nowrap;
+    align-items: center; padding: 3px 6px; border-radius: 4px; cursor: pointer;
+    font-size: 14px;
+  }
+  .row.on { background: rgba(80, 200, 255, 0.12); }
+  .row .icon { color: #8ff; white-space: pre; }
+  .row .cnt { display: flex; align-items: center; gap: 6px; }
+  .row button, .actions button {
+    font: inherit; color: var(--ink); background: #0b2a3c; border: 1px solid var(--edge);
+    border-radius: 4px; cursor: pointer;
+  }
+  .row button { width: 24px; height: 22px; padding: 0; }
+  .row .n { width: 22px; text-align: right; }
+  .actions { display: flex; gap: 8px; justify-content: space-between; margin-top: 12px; }
+  .actions button { padding: 6px 12px; }
+  .actions .go { background: #1d6b8c; font-weight: bold; }
+  .actions .go:disabled { opacity: 0.4; cursor: default; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="banner" hidden></div>
+<div id="help"></div>
+<div id="picker" hidden>
+  <div class="box">
+    <h1>АКВАРИУМ</h1>
+    <p>↑/↓ вид · ←/→ количество · пробел вкл/выкл · r случайно · Enter старт</p>
+    <div id="rows"></div>
+    <div class="actions">
+      <button id="rand" type="button">r — случайный набор</button>
+      <button id="go" class="go" type="button">ENTER — СТАРТ</button>
+    </div>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"
+        integrity="sha384-CI3ELBVUz9XQO+97x6nwMDPosPR5XvsxW2ua7N1Xeygeh1IxtgqtCkGfQY9WWdHu"
+        crossorigin="anonymous"></script>
+<script src="data.js"></script>
+<script src="aquarium.js"></script>
+</body>
+</html>
