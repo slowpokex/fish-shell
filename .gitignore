@@ -1,2 +1,6 @@
 .superpowers/
 __pycache__/
+.playwright-mcp/
+tools/
+gb/build/
+*.gbc.ram
